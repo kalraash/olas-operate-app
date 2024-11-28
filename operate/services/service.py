@@ -43,9 +43,9 @@ from aea.configurations.constants import (
 from aea.configurations.data_types import PackageType
 from aea.helpers.yaml_utils import yaml_dump, yaml_load, yaml_load_all
 from aea_cli_ipfs.ipfs_utils import IPFSTool
-from autonomy.cli.helpers.deployment import run_deployment, stop_deployment
+from autonomy.cli.helpers.deployment import build_deployment, run_deployment, run_host_deployment, stop_deployment
 from autonomy.configurations.loader import load_service_config
-from autonomy.deploy.base import BaseDeploymentGenerator
+from autonomy.deploy.generators.localhost.base import HostDeploymentGenerator
 from autonomy.deploy.base import ServiceBuilder as BaseServiceBuilder
 from autonomy.deploy.constants import (
     AGENT_KEYS_DIR,
@@ -83,7 +83,7 @@ from operate.operate_types import (
     ServiceTemplate,
 )
 from operate.resource import LocalResource
-from operate.services.deployment_runner import run_host_deployment, stop_host_deployment
+from operate.services.deployment_runner import stop_host_deployment
 from operate.services.utils import tendermint
 
 
@@ -267,90 +267,90 @@ class ServiceHelper:
         return DeploymentConfig(self.config.json.get("deployment", {}))  # type: ignore
 
 
-# TODO: Port back to open-autonomy
-class HostDeploymentGenerator(BaseDeploymentGenerator):
-    """Host deployment."""
+# # TODO: Port back to open-autonomy
+# class HostDeploymentGenerator(BaseDeploymentGenerator):
+#     """Host deployment."""
 
-    output_name: str = "runtime.json"
-    deployment_type: str = "host"
+#     output_name: str = "runtime.json"
+#     deployment_type: str = "host"
 
-    def generate_config_tendermint(self) -> "HostDeploymentGenerator":
-        """Generate tendermint configuration."""
-        tmhome = str(self.build_dir / "node")
-        tendermint_executable = str(
-            shutil.which("tendermint"),
-        )
-        # TODO: move all platform related things to a dedicated file
-        if platform.system() == "Windows":
-            tendermint_executable = str(
-                Path(os.path.dirname(sys.executable)) / "tendermint.exe"
-            )
-        subprocess.run(  # pylint: disable=subprocess-run-check # nosec
-            args=[
-                tendermint_executable,
-                "--home",
-                tmhome,
-                "init",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+#     def generate_config_tendermint(self) -> "HostDeploymentGenerator":
+#         """Generate tendermint configuration."""
+#         tmhome = str(self.build_dir / "node")
+#         tendermint_executable = str(
+#             shutil.which("tendermint"),
+#         )
+#         # TODO: move all platform related things to a dedicated file
+#         if platform.system() == "Windows":
+#             tendermint_executable = str(
+#                 Path(os.path.dirname(sys.executable)) / "tendermint.exe"
+#             )
+#         subprocess.run(  # pylint: disable=subprocess-run-check # nosec
+#             args=[
+#                 tendermint_executable,
+#                 "--home",
+#                 tmhome,
+#                 "init",
+#             ],
+#             stdout=subprocess.PIPE,
+#             stderr=subprocess.PIPE,
+#         )
 
-        # TODO: Dynamic port allocation
-        params = {
-            "TMHOME": tmhome,
-            "TMSTATE": str(self.build_dir / "tm_state"),
-            "P2P_LADDR": "tcp://localhost:26656",
-            "RPC_LADDR": "tcp://localhost:26657",
-            "PROXY_APP": "tcp://localhost:26658",
-            "CREATE_EMPTY_BLOCKS": "true",
-            "USE_GRPC": "false",
-            "FLASK_APP": "tendermint:create_server",
-        }
-        (self.build_dir / "tendermint.json").write_text(
-            json.dumps(params, indent=2),
-            encoding="utf-8",
-        )
-        shutil.copy(
-            tendermint.__file__.replace(".pyc", ".py"),
-            self.build_dir / "tendermint.py",
-        )
-        return self
+#         # TODO: Dynamic port allocation
+#         params = {
+#             "TMHOME": tmhome,
+#             "TMSTATE": str(self.build_dir / "tm_state"),
+#             "P2P_LADDR": "tcp://localhost:26656",
+#             "RPC_LADDR": "tcp://localhost:26657",
+#             "PROXY_APP": "tcp://localhost:26658",
+#             "CREATE_EMPTY_BLOCKS": "true",
+#             "USE_GRPC": "false",
+#             "FLASK_APP": "tendermint:create_server",
+#         }
+#         (self.build_dir / "tendermint.json").write_text(
+#             json.dumps(params, indent=2),
+#             encoding="utf-8",
+#         )
+#         shutil.copy(
+#             tendermint.__file__.replace(".pyc", ".py"),
+#             self.build_dir / "tendermint.py",
+#         )
+#         return self
 
-    def generate(
-        self,
-        image_version: t.Optional[str] = None,
-        use_hardhat: bool = False,
-        use_acn: bool = False,
-    ) -> "HostDeploymentGenerator":
-        """Generate agent and tendermint configurations"""
-        agent = self.service_builder.generate_agent(agent_n=0)
-        agent = {key: f"{value}" for key, value in agent.items()}
-        (self.build_dir / "agent.json").write_text(
-            json.dumps(agent, indent=2),
-            encoding="utf-8",
-        )
-        return self
+#     def generate(
+#         self,
+#         image_version: t.Optional[str] = None,
+#         use_hardhat: bool = False,
+#         use_acn: bool = False,
+#     ) -> "HostDeploymentGenerator":
+#         """Generate agent and tendermint configurations"""
+#         agent = self.service_builder.generate_agent(agent_n=0)
+#         agent = {key: f"{value}" for key, value in agent.items()}
+#         (self.build_dir / "agent.json").write_text(
+#             json.dumps(agent, indent=2),
+#             encoding="utf-8",
+#         )
+#         return self
 
-    def _populate_keys(self) -> None:
-        """Populate the keys directory"""
-        # TODO: Add multiagent support
-        kp, *_ = t.cast(t.List[t.Dict[str, str]], self.service_builder.keys)
-        key = kp[PRIVATE_KEY]
-        ledger = kp.get(LEDGER, DEFAULT_LEDGER)
-        keys_file = self.build_dir / PRIVATE_KEY_PATH_SCHEMA.format(ledger)
-        keys_file.write_text(key, encoding=DEFAULT_ENCODING)
+#     def _populate_keys(self) -> None:
+#         """Populate the keys directory"""
+#         # TODO: Add multiagent support
+#         kp, *_ = t.cast(t.List[t.Dict[str, str]], self.service_builder.keys)
+#         key = kp[PRIVATE_KEY]
+#         ledger = kp.get(LEDGER, DEFAULT_LEDGER)
+#         keys_file = self.build_dir / PRIVATE_KEY_PATH_SCHEMA.format(ledger)
+#         keys_file.write_text(key, encoding=DEFAULT_ENCODING)
 
-    def _populate_keys_multiledger(self) -> None:
-        """Populate the keys directory with multiple set of keys"""
+#     def _populate_keys_multiledger(self) -> None:
+#         """Populate the keys directory with multiple set of keys"""
 
-    def populate_private_keys(self) -> "DockerComposeGenerator":
-        """Populate the private keys to the build directory for host mapping."""
-        if self.service_builder.multiledger:
-            self._populate_keys_multiledger()
-        else:
-            self._populate_keys()
-        return self
+#     def populate_private_keys(self) -> "DockerComposeGenerator":
+#         """Populate the private keys to the build directory for host mapping."""
+#         if self.service_builder.multiledger:
+#             self._populate_keys_multiledger()
+#         else:
+#             self._populate_keys()
+#         return self
 
 
 @dataclass
@@ -533,34 +533,42 @@ class Deployment(LocalResource):
             encoding="utf-8",
         )
         try:
-            builder = ServiceBuilder.from_dir(
-                path=service.service_path,
-                keys_file=keys_file,
-                number_of_agents=len(service.keys),
-            )
-            builder.deplopyment_type = HostDeploymentGenerator.deployment_type
-            builder.try_update_abci_connection_params()
-            builder.try_update_runtime_params(
-                multisig_address=chain_data.multisig,
-                agent_instances=chain_data.instances,
-                service_id=chain_data.token,
-                consensus_threshold=None,
-            )
-            # TODO: Support for multiledger
-            builder.try_update_ledger_params(
-                chain=LedgerType(ledger_config.type).name.lower(),
-                address=ledger_config.rpc,
-            )
+            # builder = ServiceBuilder.from_dir(
+            #     path=service.service_path,
+            #     keys_file=keys_file,
+            #     number_of_agents=len(service.keys),
+            # )
+            # builder.deplopyment_type = HostDeploymentGenerator.deployment_type
+            # builder.try_update_abci_connection_params()
+            # builder.try_update_runtime_params(
+            #     multisig_address=chain_data.multisig,
+            #     agent_instances=chain_data.instances,
+            #     service_id=chain_data.token,
+            #     consensus_threshold=None,
+            # )
+            # # TODO: Support for multiledger
+            # builder.try_update_ledger_params(
+            #     chain=LedgerType(ledger_config.type).name.lower(),
+            #     address=ledger_config.rpc,
+            # )
 
-            (
-                HostDeploymentGenerator(
-                    service_builder=builder,
-                    build_dir=build.resolve(),
-                    use_tm_testnet_setup=True,
-                )
-                .generate_config_tendermint()
-                .generate()
-                .populate_private_keys()
+            # (
+            #     HostDeploymentGenerator(
+            #         service_builder=builder,
+            #         build_dir=build.resolve(),
+            #         use_tm_testnet_setup=True,
+            #     )
+            #     .generate_config_tendermint()
+            #     .generate()
+            #     .populate_private_keys()
+            # )
+            os.chdir(service.service_path)
+            build_deployment(
+                keys_file=keys_file,
+                build_dir=build.resolve(),
+                deployment_type=HostDeploymentGenerator.deployment_type,
+                mkdir=['agent/data'],
+                dev_mode=False,
             )
 
         except Exception as e:
@@ -603,7 +611,7 @@ class Deployment(LocalResource):
             if use_docker:
                 run_deployment(build_dir=self.path / "deployment", detach=True)
             else:
-                run_host_deployment(build_dir=self.path / "deployment")
+                run_host_deployment(build_dir=self.path / "deployment", detach=True)
         except Exception:
             self.status = DeploymentStatus.BUILT
             self.store()
